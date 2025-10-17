@@ -238,4 +238,450 @@ The admin panel (`/admin/`) provides a comprehensive interface for managing:
 - **Loan Management**: Application approval, repayment tracking
 - **Meeting Management**: Schedule, attendance, minutes
 - **Notification Center**: Send bulk messages, view notification history
-- **Aud
+- **Audit Logs**: Complete system activity tracking
+
+### Custom Admin Actions
+- Bulk approve/reject loans
+- Export financial reports (PDF/Excel)
+- Send notifications to selected members
+- Generate contribution reminders
+- Mark contributions as paid
+- Process payouts
+
+---
+
+## 🔐 User Roles & Permissions
+
+### Administrator
+- Full system access
+- Create and manage Chamas
+- Approve loans and payouts
+- View all financial reports
+- Manage system settings
+
+### Treasurer
+- Record contributions
+- Process payments
+- Generate financial reports
+- Manage loan applications
+- Track member balances
+
+### Secretary
+- Record meeting minutes
+- Track attendance
+- Send notifications
+- Manage member communications
+
+### Member
+- View personal contribution history
+- Apply for loans
+- Check payout schedule
+- View meeting schedules
+- Receive notifications
+
+---
+
+## 🔄 Workflow Examples
+
+### 1. Contribution Cycle Flow
+
+```mermaid
+graph TD
+    A[New Cycle Created] --> B[Members Notified]
+    B --> C[Members Make Contributions]
+    C --> D[Treasurer Records Payments]
+    D --> E{All Contributions Received?}
+    E -->|Yes| F[Calculate Payout Amount]
+    E -->|No| G[Send Reminders]
+    G --> C
+    F --> H[Process Payout to Beneficiary]
+    H --> I[Update Member Records]
+    I --> J[Cycle Completed]
+    J --> K[Start Next Cycle]
+```
+
+### 2. Loan Application Flow
+
+```python
+# Example: Loan Application Process
+1. Member submits loan application
+2. System validates eligibility
+3. Guarantors receive notification
+4. Guarantors accept/decline
+5. Admin/Treasurer reviews application
+6. Loan approved/rejected
+7. If approved: Funds disbursed
+8. Repayment schedule created
+9. Monthly reminders sent
+10. Track repayments until completion
+```
+
+---
+
+## 📊 API Endpoints
+
+### Authentication
+```
+POST   /api/auth/register/          - Register new user
+POST   /api/auth/login/             - Login
+POST   /api/auth/logout/            - Logout
+POST   /api/auth/password-reset/    - Password reset
+```
+
+### Chamas
+```
+GET    /api/chamas/                 - List all chamas
+POST   /api/chamas/                 - Create chama
+GET    /api/chamas/{id}/            - Chama details
+PUT    /api/chamas/{id}/            - Update chama
+DELETE /api/chamas/{id}/            - Delete chama
+GET    /api/chamas/{id}/members/    - List members
+GET    /api/chamas/{id}/stats/      - Financial statistics
+```
+
+### Contributions
+```
+GET    /api/contributions/          - List contributions
+POST   /api/contributions/          - Record contribution
+GET    /api/contributions/{id}/     - Contribution details
+PUT    /api/contributions/{id}/     - Update contribution
+```
+
+### Loans
+```
+GET    /api/loans/                  - List loans
+POST   /api/loans/                  - Apply for loan
+GET    /api/loans/{id}/             - Loan details
+POST   /api/loans/{id}/approve/     - Approve loan
+POST   /api/loans/{id}/disburse/    - Disburse funds
+POST   /api/loans/{id}/repay/       - Record repayment
+```
+
+### Payouts
+```
+GET    /api/payouts/                - List payouts
+POST   /api/payouts/                - Create payout
+POST   /api/payouts/{id}/approve/   - Approve payout
+POST   /api/payouts/{id}/process/   - Process payout
+```
+
+### Meetings
+```
+GET    /api/meetings/               - List meetings
+POST   /api/meetings/               - Schedule meeting
+GET    /api/meetings/{id}/          - Meeting details
+POST   /api/meetings/{id}/attendance/ - Mark attendance
+```
+
+---
+
+## 🧪 Testing
+
+### Run Tests
+```bash
+# Run all tests
+python manage.py test
+
+# Run specific app tests
+python manage.py test main_application
+
+# Run with coverage
+coverage run --source='.' manage.py test
+coverage report
+coverage html
+```
+
+### Sample Test
+```python
+from django.test import TestCase
+from main_application.models import Chama, User
+
+class ChamaTestCase(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='testuser',
+            email='test@example.com',
+            phone_number='254712345678'
+        )
+        
+    def test_chama_creation(self):
+        chama = Chama.objects.create(
+            name='Test Chama',
+            contribution_amount=1000,
+            contribution_frequency='MONTHLY',
+            created_by=self.user
+        )
+        self.assertEqual(chama.name, 'Test Chama')
+        self.assertEqual(chama.total_members, 0)
+```
+
+---
+
+## 🚀 Deployment
+
+### Production Checklist
+
+- [ ] Set `DEBUG=False` in production
+- [ ] Configure proper `SECRET_KEY`
+- [ ] Set up PostgreSQL database
+- [ ] Configure Redis for caching
+- [ ] Set up Celery for async tasks
+- [ ] Configure Gunicorn/uWSGI
+- [ ] Set up Nginx reverse proxy
+- [ ] Enable HTTPS/SSL certificates
+- [ ] Configure static files serving
+- [ ] Set up automated backups
+- [ ] Configure monitoring (Sentry)
+- [ ] Set up log management
+- [ ] Configure firewall rules
+
+### Docker Deployment
+
+```dockerfile
+# Dockerfile
+FROM python:3.10-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+RUN python manage.py collectstatic --noinput
+
+CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000"]
+```
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+
+services:
+  db:
+    image: postgres:13
+    environment:
+      POSTGRES_DB: chama_smart_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: your_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+
+  web:
+    build: .
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000
+    volumes:
+      - ./:/app
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - redis
+    env_file:
+      - .env
+
+  celery:
+    build: .
+    command: celery -A config worker -l info
+    volumes:
+      - ./:/app
+    depends_on:
+      - db
+      - redis
+    env_file:
+      - .env
+
+volumes:
+  postgres_data:
+  static_volume:
+  media_volume:
+```
+
+---
+
+## 📱 M-Pesa Integration
+
+### STK Push (Lipa Na M-Pesa)
+
+```python
+from mpesa import MpesaClient
+
+def initiate_stk_push(phone_number, amount, account_reference):
+    """
+    Initiate M-Pesa STK Push for contribution payment
+    """
+    client = MpesaClient()
+    response = client.stk_push(
+        phone_number=phone_number,
+        amount=amount,
+        account_reference=account_reference,
+        transaction_desc='Chama Contribution'
+    )
+    return response
+```
+
+### Callback Handling
+
+```python
+from django.views.decorators.csrf import csrf_exempt
+from django.http import JsonResponse
+import json
+
+@csrf_exempt
+def mpesa_callback(request):
+    """
+    Handle M-Pesa payment callbacks
+    """
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        # Process payment confirmation
+        # Update contribution status
+        return JsonResponse({'ResultCode': 0, 'ResultDesc': 'Success'})
+```
+
+---
+
+## 📈 Performance Optimization
+
+### Database Indexing
+All critical fields are indexed for optimal query performance:
+- User lookups (phone, email)
+- Contribution queries (date, status)
+- Financial calculations
+- Search operations
+
+### Caching Strategy
+```python
+# settings.py
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': 'redis://127.0.0.1:6379/1',
+    }
+}
+
+# Use in views
+from django.core.cache import cache
+
+def get_chama_stats(chama_id):
+    cache_key = f'chama_stats_{chama_id}'
+    stats = cache.get(cache_key)
+    
+    if not stats:
+        stats = calculate_stats(chama_id)
+        cache.set(cache_key, stats, 3600)  # Cache for 1 hour
+    
+    return stats
+```
+
+---
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+**Issue**: Database connection error
+```bash
+# Solution: Check PostgreSQL is running
+sudo service postgresql status
+sudo service postgresql start
+```
+
+**Issue**: M-Pesa integration fails
+```bash
+# Solution: Verify credentials in .env
+# Check sandbox vs production environment
+# Verify callback URL is accessible
+```
+
+**Issue**: Static files not loading
+```bash
+# Solution: Collect static files
+python manage.py collectstatic --clear
+python manage.py collectstatic
+```
+
+---
+
+## 📚 Documentation
+
+- [Django Documentation](https://docs.djangoproject.com/)
+- [Django REST Framework](https://www.django-rest-framework.org/)
+- [M-Pesa Daraja API](https://developer.safaricom.co.ke/)
+- [Africa's Talking SMS](https://developers.africastalking.com/)
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions! Please follow these steps:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+### Code Standards
+- Follow PEP 8 style guide
+- Write comprehensive tests
+- Document all functions and classes
+- Keep commits atomic and well-described
+
+---
+
+## 📄 License
+
+This is proprietary software. All rights reserved.
+
+**Copyright © 2025 Chama Smart**
+
+For licensing inquiries, contact: licensing@chamasmart.com
+
+---
+
+## 📞 Support
+
+- **Email**: support@chamasmart.com
+- **Documentation**: https://docs.chamasmart.com
+- **Issue Tracker**: https://github.com/yourusername/chama-smart/issues
+- **WhatsApp Support**: +254 XXX XXX XXX
+
+---
+
+## 🎉 Acknowledgments
+
+- Built with Django and Django REST Framework
+- Inspired by traditional Kenyan Chama practices
+- Special thanks to the open-source community
+
+---
+
+## 🗺️ Roadmap
+
+### Version 1.1 (Q1 2025)
+- [ ] Mobile app (iOS/Android)
+- [ ] Advanced analytics dashboard
+- [ ] Automated tax reporting
+- [ ] Multi-currency support
+
+### Version 1.2 (Q2 2025)
+- [ ] Investment tracking module
+- [ ] Integration with equity platforms
+- [ ] Smart contract integration
+- [ ] AI-powered financial insights
+
+### Version 2.0 (Q3 2025)
+- [ ] Blockchain-based transparency
+- [ ] DeFi integration
+- [ ] International expansion
+- [ ] White-label solution
+
+---
+
+**Made by Steve Ongera | 0112284093 in Kenya**
