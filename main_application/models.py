@@ -113,9 +113,13 @@ class Chama(models.Model):
     
     @property
     def total_contributions(self):
-        return self.contributions.filter(status='COMPLETED').aggregate(
-            total=models.Sum('amount')
-        )['total'] or Decimal('0.00')
+        from django.db.models import Sum
+        # Get all contributions through cycles
+        total = Contribution.objects.filter(
+            cycle__chama=self,
+            status='COMPLETED'
+        ).aggregate(total=Sum('amount'))['total']
+        return total or Decimal('0.00')
 
 
 class ChamaMembership(models.Model):
