@@ -123,36 +123,184 @@ def dashboard_view(request):
     else:  # MEMBER
         return member_dashboard(request)
 
+from django.shortcuts import render
+from django.contrib.auth.decorators import login_required
+from django.db.models import Sum, Count, Avg, Q, F
+from django.db.models.functions import TruncMonth, TruncWeek, TruncDate
+from django.utils import timezone
+from decimal import Decimal
+from datetime import timedelta
+import json
+
+from .models import (
+    Chama, User, ChamaMembership, Contribution, 
+    ContributionCycle, Payout, Loan, LoanRepayment,
+    Meeting, Notification
+)
+
 
 @login_required
 def admin_dashboard(request):
     """
-    Administrator dashboard with system-wide overview
+    Enhanced Administrator dashboard with comprehensive analytics
     """
-    # System-wide statistics
+    # Date ranges for filtering
+    today = timezone.now().date()
+    last_30_days = today - timedelta(days=30)
+    last_90_days = today - timedelta(days=90)
+    current_year = today.year
+    
+    # ============= SYSTEM-WIDE STATISTICS =============
     total_chamas = Chama.objects.count()
     active_chamas = Chama.objects.filter(status='ACTIVE').count()
+    suspended_chamas = Chama.objects.filter(status='SUSPENDED').count()
+    inactive_chamas = Chama.objects.filter(status='INACTIVE').count()
+    
     total_users = User.objects.count()
     verified_users = User.objects.filter(is_verified=True).count()
     total_members = ChamaMembership.objects.filter(status='ACTIVE').count()
+    pending_memberships = ChamaMembership.objects.filter(status='PENDING').count()
     
-    # Financial statistics
+    # ============= FINANCIAL STATISTICS =============
     total_contributions = Contribution.objects.filter(
         status='COMPLETED'
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+    
+    contributions_this_month = Contribution.objects.filter(
+        status='COMPLETED',
+        payment_date__month=today.month,
+        payment_date__year=today.year
     ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
     
     total_payouts = Payout.objects.filter(
         status='COMPLETED'
     ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
     
-    active_loans = Loan.objects.filter(status='ACTIVE').count()
+    pending_payouts = Payout.objects.filter(
+        status='PENDING'
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+    
+    active_loans = Loan.objects.filter(status__in=['ACTIVE', 'DISBURSED']).count()
     total_loans_amount = Loan.objects.filter(
         status__in=['ACTIVE', 'DISBURSED']
     ).aggregate(total=Sum('balance'))['total'] or Decimal('0.00')
     
-    # Recent activities
+    pending_loans = Loan.objects.filter(status='PENDING').count()
+    defaulted_loans = Loan.objects.filter(status='DEFAULTED').count()
+    
+    # ============= MONTHLY CONTRIBUTIONS TREND (Bar Chart) =============
+    monthly_contributions = Contribution.objects.filter(
+        status='COMPLETED',
+        payment_date__year=current_year
+    ).annotate(
+        month=TruncMonth('payment_date')
+    ).values('month').annotate(
+        total_amount=Sum('amount'),
+        count=Count('id')
+    ).order_by('month')
+    
+    months_labels = []
+    monthly_amounts = []
+    for item in monthly_contributions:
+        months_labels.append(item['month'].strftime('%b %Y'))
+        monthly_amounts.append(float(item['total_amount']))
+    
+    # ============= PAYMENT METHOD DISTRIBUTION (Pie Chart) =============
+    payment_methods = Contribution.objects.filter(
+        status='COMPLETED'
+    ).values('payment_method').annotate(
+        total=Sum('amount'),
+        count=Count('id')
+    ).order_by('-total')
+    
+    payment_method_labels = [item['payment_method'] for item in payment_methods]
+    payment_method_values = [float(item['total']) for item in payment_methods]
+    
+    # ============= CHAMA STATUS DISTRIBUTION (Donut Chart) =============
+    chama_status = Chama.objects.values('status').annotate(
+        count=Count('id')
+    ).order_by('-count')
+    
+    chama_status_labels = [item['status'] for item in chama_status]
+    chama_status_values = [item['count'] for item in chama_status]
+    
+    # ============= LOAN STATUS DISTRIBUTION (Donut Chart) =============
+    loan_status = Loan.objects.values('status').annotate(
+        count=Count('id'),
+        total_amount=Sum('principal_amount')
+    ).order_by('-count')
+    
+    loan_status_labels = [item['status'] for item in loan_status]
+    loan_status_values = [item['count'] for item in loan_status]
+    
+    # ============= CONTRIBUTIONS VS PAYOUTS TREND (Line Chart) =============
+    last_6_months_contributions = Contribution.objects.filter(
+        status='COMPLETED',
+        payment_date__gte=last_90_days
+    ).annotate(
+        week=TruncWeek('payment_date')
+    ).values('week').annotate(
+        total=Sum('amount')
+    ).order_by('week')
+    
+    last_6_months_payouts = Payout.objects.filter(
+        status='COMPLETED',
+        actual_payment_date__gte=last_90_days
+    ).annotate(
+        week=TruncWeek('actual_payment_date')
+    ).values('week').annotate(
+        total=Sum('amount')
+    ).order_by('week')
+    
+    trend_labels = []
+    contributions_trend = []
+    payouts_trend = []
+    
+    for item in last_6_months_contributions:
+        trend_labels.append(item['week'].strftime('%b %d'))
+        contributions_trend.append(float(item['total']))
+    
+    payout_dict = {p['week'].strftime('%b %d'): float(p['total']) for p in last_6_months_payouts}
+    payouts_trend = [payout_dict.get(label, 0) for label in trend_labels]
+    
+    # ============= TOP PERFORMING CHAMAS (Bar Chart) =============
+    top_chamas = Chama.objects.annotate(
+        total_contributions=Sum(
+            'cycles__contributions__amount',
+            filter=Q(cycles__contributions__status='COMPLETED')
+        ),
+        member_count=Count('memberships', filter=Q(memberships__status='ACTIVE'))
+    ).order_by('-total_contributions')[:10]
+    
+    top_chamas_labels = [chama.name[:20] for chama in top_chamas]
+    top_chamas_values = [float(chama.total_contributions or 0) for chama in top_chamas]
+    
+    # ============= MEMBER GROWTH TREND (Line Chart) =============
+    member_growth = ChamaMembership.objects.filter(
+        status='ACTIVE'
+    ).annotate(
+        month=TruncMonth('joined_date')
+    ).values('month').annotate(
+        count=Count('id')
+    ).order_by('month')[:12]
+    
+    member_growth_labels = [item['month'].strftime('%b %Y') for item in member_growth]
+    member_growth_values = [item['count'] for item in member_growth]
+    
+    # ============= LOAN REPAYMENT RATE =============
+    total_loans_value = Loan.objects.filter(
+        status__in=['ACTIVE', 'DISBURSED', 'COMPLETED']
+    ).aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
+    
+    total_repaid = Loan.objects.filter(
+        status__in=['ACTIVE', 'DISBURSED', 'COMPLETED']
+    ).aggregate(total=Sum('amount_paid'))['total'] or Decimal('0.00')
+    
+    repayment_rate = (float(total_repaid) / float(total_loans_value) * 100) if total_loans_value > 0 else 0
+    
+    # ============= RECENT ACTIVITIES =============
     recent_chamas = Chama.objects.select_related('created_by').order_by('-created_at')[:5]
-    pending_loans = Loan.objects.filter(status='PENDING').select_related(
+    pending_loan_requests = Loan.objects.filter(status='PENDING').select_related(
         'membership__user', 'chama'
     ).order_by('-application_date')[:10]
     
@@ -162,27 +310,79 @@ def admin_dashboard(request):
         'membership__user', 'cycle__chama'
     ).order_by('-payment_date')[:10]
     
-    # Recent notifications
+    upcoming_meetings = Meeting.objects.filter(
+        status='SCHEDULED',
+        scheduled_date__gte=timezone.now()
+    ).select_related('chama', 'secretary').order_by('scheduled_date')[:5]
+    
+    # ============= NOTIFICATIONS =============
     unread_notifications = Notification.objects.filter(
         user=request.user,
         status__in=['PENDING', 'SENT']
     ).count()
     
+    # ============= CONTRIBUTION CYCLES STATUS =============
+    active_cycles = ContributionCycle.objects.filter(status='ACTIVE').count()
+    completed_cycles = ContributionCycle.objects.filter(status='COMPLETED').count()
+    
+    # ============= PREPARE CONTEXT =============
     context = {
         'page_title': 'Admin Dashboard',
         'user_role': 'Administrator',
+        
+        # System Stats
         'total_chamas': total_chamas,
         'active_chamas': active_chamas,
+        'suspended_chamas': suspended_chamas,
+        'inactive_chamas': inactive_chamas,
         'total_users': total_users,
         'verified_users': verified_users,
         'total_members': total_members,
+        'pending_memberships': pending_memberships,
+        
+        # Financial Stats
         'total_contributions': total_contributions,
+        'contributions_this_month': contributions_this_month,
         'total_payouts': total_payouts,
+        'pending_payouts': pending_payouts,
         'active_loans': active_loans,
         'total_loans_amount': total_loans_amount,
-        'recent_chamas': recent_chamas,
         'pending_loans': pending_loans,
+        'defaulted_loans': defaulted_loans,
+        'repayment_rate': round(repayment_rate, 2),
+        
+        # Cycle Stats
+        'active_cycles': active_cycles,
+        'completed_cycles': completed_cycles,
+        
+        # Chart Data (JSON serialized for JavaScript)
+        'monthly_contributions_labels': json.dumps(months_labels),
+        'monthly_contributions_data': json.dumps(monthly_amounts),
+        
+        'payment_method_labels': json.dumps(payment_method_labels),
+        'payment_method_data': json.dumps(payment_method_values),
+        
+        'chama_status_labels': json.dumps(chama_status_labels),
+        'chama_status_data': json.dumps(chama_status_values),
+        
+        'loan_status_labels': json.dumps(loan_status_labels),
+        'loan_status_data': json.dumps(loan_status_values),
+        
+        'trend_labels': json.dumps(trend_labels),
+        'contributions_trend': json.dumps(contributions_trend),
+        'payouts_trend': json.dumps(payouts_trend),
+        
+        'top_chamas_labels': json.dumps(top_chamas_labels),
+        'top_chamas_data': json.dumps(top_chamas_values),
+        
+        'member_growth_labels': json.dumps(member_growth_labels),
+        'member_growth_data': json.dumps(member_growth_values),
+        
+        # Recent Activities
+        'recent_chamas': recent_chamas,
+        'pending_loan_requests': pending_loan_requests,
         'recent_contributions': recent_contributions,
+        'upcoming_meetings': upcoming_meetings,
         'unread_notifications': unread_notifications,
     }
     
