@@ -265,12 +265,16 @@ def admin_dashboard(request):
     
     # ============= TOP PERFORMING CHAMAS (Bar Chart) =============
     top_chamas = Chama.objects.annotate(
-        total_contributions=Sum(
+        annotated_total_contributions=Sum(
             'cycles__contributions__amount',
             filter=Q(cycles__contributions__status='COMPLETED')
         ),
         member_count=Count('memberships', filter=Q(memberships__status='ACTIVE'))
-    ).order_by('-total_contributions')[:10]
+    ).order_by('-annotated_total_contributions')[:10]
+
+    top_chamas_labels = [chama.name[:20] for chama in top_chamas]
+    top_chamas_values = [float(chama.annotated_total_contributions or 0) for chama in top_chamas]
+
     
     top_chamas_labels = [chama.name[:20] for chama in top_chamas]
     top_chamas_values = [float(chama.total_contributions or 0) for chama in top_chamas]

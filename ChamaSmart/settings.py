@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'main_application',
+    'django.contrib.humanize',
 ]
 
 # CUSTOM USER MODEL
