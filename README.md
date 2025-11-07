@@ -1,4 +1,4 @@
-# 🏦 Chama Smart - Digital Table Banking System
+# Chama Smart - Digital Table Banking System
 
 [![Django](https://img.shields.io/badge/Django-4.2+-green.svg)](https://www.djangoproject.com/)
 [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
@@ -6,9 +6,9 @@
 
 A professional, production-ready Django application for managing Chama (Merry-Go-Round/Table Banking) groups in Kenya and East Africa. Built with security, scalability, and modern financial management practices in mind.
 
-## 🎯 Key Features
+## Key Features
 
-### 💰 **Financial Management**
+###  **Financial Management**
 - **Contribution Tracking**: Automated cycle-based contribution collection
 - **Merry-Go-Round Rotation**: Smart payout queue management
 - **Loan Management**: Member loans with interest calculation and guarantors
