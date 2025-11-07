@@ -1,0 +1,1586 @@
+{% extends 'admin_base.html' %}
+{% load humanize %}
+
+{% block title %}Member Dashboard - Chama Smart{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div>
+            <h1 class="page-title">Welcome Back, {{ request.user.first_name }}!</h1>
+            <p class="page-subtitle">Here's your chama activity and financial overview</p>
+        </div>
+        <div class="header-actions">
+            <button class="btn btn-secondary" onclick="window.print()">
+                <i class="bi bi-printer"></i>
+                Print Summary
+            </button>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#contributionModal">
+                <i class="bi bi-cash-stack"></i>
+                Make Contribution
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Statistics Cards -->
+    <div class="stats-grid">
+        <div class="stat-card purple">
+            <div class="stat-card-icon">
+                <i class="bi bi-wallet2"></i>
+            </div>
+            <div class="stat-card-value">KES {{ total_contributed|floatformat:2|intcomma }}</div>
+            <div class="stat-card-label">Total Contributions</div>
+            <div class="stat-card-footer">
+                <span class="info-badge">
+                    <i class="bi bi-building"></i> {{ user_chamas.count }} Chama{{ user_chamas.count|pluralize }}
+                </span>
+            </div>
+        </div>
+
+        <div class="stat-card blue">
+            <div class="stat-card-icon">
+                <i class="bi bi-arrow-down-circle"></i>
+            </div>
+            <div class="stat-card-value">KES {{ total_received|floatformat:2|intcomma }}</div>
+            <div class="stat-card-label">Total Received</div>
+            <div class="stat-card-footer">
+                <span class="success-badge">
+                    <i class="bi bi-check-circle"></i> Payouts Completed
+                </span>
+            </div>
+        </div>
+
+        <div class="stat-card gradient-orange">
+            <div class="stat-card-icon">
+                <i class="bi bi-credit-card"></i>
+            </div>
+            <div class="stat-card-value">KES {{ total_loan_balance|floatformat:2|intcomma }}</div>
+            <div class="stat-card-label">Active Loan Balance</div>
+            <div class="stat-card-footer">
+                <span class="warning-badge">{{ active_loans.count }} Active Loan{{ active_loans.count|pluralize }}</span>
+            </div>
+        </div>
+
+        <div class="stat-card gradient-green">
+            <div class="stat-card-icon">
+                <i class="bi bi-bell"></i>
+            </div>
+            <div class="stat-card-value">{{ unread_notifications }}</div>
+            <div class="stat-card-label">Unread Notifications</div>
+            <div class="stat-card-footer">
+                <a href="#notifications" class="view-all-link">
+                    <i class="bi bi-eye"></i> View All
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chama Memberships Overview -->
+    <div class="section-header">
+        <h2 class="section-title">
+            <i class="bi bi-building"></i>
+            My Chama Memberships
+        </h2>
+    </div>
+
+    <div class="chama-cards-grid">
+        {% for membership in user_memberships %}
+        <div class="chama-membership-card">
+            <div class="chama-card-header">
+                <div class="chama-card-icon">
+                    <i class="bi bi-bank"></i>
+                </div>
+                <div>
+                    <h3 class="chama-card-title">{{ membership.chama.name }}</h3>
+                    <p class="chama-card-subtitle">Member #{{ membership.membership_number }}</p>
+                </div>
+                <div class="chama-card-badge">
+                    {% if membership.status == 'ACTIVE' %}
+                    <span class="badge badge-success">Active</span>
+                    {% elif membership.status == 'PENDING' %}
+                    <span class="badge badge-warning">Pending</span>
+                    {% elif membership.status == 'SUSPENDED' %}
+                    <span class="badge badge-danger">Suspended</span>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="chama-card-body">
+                <div class="chama-info-row">
+                    <div class="chama-info-item">
+                        <span class="info-label">Position in Rotation</span>
+                        <span class="info-value">{{ membership.position_in_rotation }} / {{ membership.chama.total_members }}</span>
+                    </div>
+                    <div class="chama-info-item">
+                        <span class="info-label">Contribution Amount</span>
+                        <span class="info-value">KES {{ membership.chama.contribution_amount|floatformat:2|intcomma }}</span>
+                    </div>
+                </div>
+                
+                <div class="chama-info-row">
+                    <div class="chama-info-item">
+                        <span class="info-label">Frequency</span>
+                        <span class="info-value">{{ membership.chama.get_contribution_frequency_display }}</span>
+                    </div>
+                    <div class="chama-info-item">
+                        <span class="info-label">Total Contributed</span>
+                        <span class="info-value">KES {{ membership.total_contributed|floatformat:2|intcomma }}</span>
+                    </div>
+                </div>
+
+                <div class="payout-status">
+                    {% if membership.has_received_payout %}
+                    <i class="bi bi-check-circle-fill text-success"></i>
+                    <span class="text-success">Payout Received on {{ membership.payout_received_date|date:"M d, Y" }}</span>
+                    {% else %}
+                    <i class="bi bi-clock text-warning"></i>
+                    <span class="text-muted">Awaiting Your Turn</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="chama-card-footer">
+                <a href="#" class="btn-link">
+                    <i class="bi bi-eye"></i> View Details
+                </a>
+                <a href="#" class="btn-link">
+                    <i class="bi bi-cash"></i> Contribute
+                </a>
+                <a href="#" class="btn-link">
+                    <i class="bi bi-credit-card"></i> Request Loan
+                </a>
+            </div>
+        </div>
+        {% empty %}
+        <div class="empty-state-large">
+            <i class="bi bi-inbox"></i>
+            <h3>No Active Memberships</h3>
+            <p>You are not currently a member of any chama. Join or create one to get started!</p>
+            <button class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> Join a Chama
+            </button>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Two Column Layout -->
+    <div class="dashboard-two-column">
+        <!-- Left Column -->
+        <div class="dashboard-left-column">
+            <!-- Pending Contributions -->
+            <div class="activity-card">
+                <div class="activity-header">
+                    <h3 class="activity-title">
+                        <i class="bi bi-exclamation-circle"></i>
+                        Pending Contributions
+                    </h3>
+                    <span class="count-badge">{{ pending_contributions.count }}</span>
+                </div>
+                <div class="activity-list">
+                    {% for contribution in pending_contributions %}
+                    <div class="contribution-item pending">
+                        <div class="contribution-icon">
+                            <i class="bi bi-hourglass-split"></i>
+                        </div>
+                        <div class="contribution-content">
+                            <div class="contribution-chama">{{ contribution.cycle.chama.name }}</div>
+                            <div class="contribution-meta">
+                                Cycle {{ contribution.cycle.cycle_number }} • Due: {{ contribution.cycle.end_date|date:"M d, Y" }}
+                            </div>
+                        </div>
+                        <div class="contribution-amount">
+                            <span class="amount-value">KES {{ contribution.amount|floatformat:2|intcomma }}</span>
+                            <button class="btn-pay-now">Pay Now</button>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="empty-state">
+                        <i class="bi bi-check-circle"></i>
+                        <p>All contributions are up to date!</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Recent Contributions -->
+            <div class="activity-card">
+                <div class="activity-header">
+                    <h3 class="activity-title">
+                        <i class="bi bi-clock-history"></i>
+                        Recent Contributions
+                    </h3>
+                    <a href="#" class="activity-link">View All</a>
+                </div>
+                <div class="activity-list">
+                    {% for contribution in recent_contributions %}
+                    <div class="activity-item">
+                        <div class="activity-avatar">
+                            <i class="bi bi-check-circle-fill text-success"></i>
+                        </div>
+                        <div class="activity-content">
+                            <div class="activity-name">{{ contribution.cycle.chama.name }}</div>
+                            <div class="activity-meta">
+                                {{ contribution.payment_date|date:"M d, Y" }} • 
+                                {{ contribution.get_payment_method_display }}
+                                {% if contribution.mpesa_receipt_number %}
+                                • {{ contribution.mpesa_receipt_number }}
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="activity-amount success">
+                            KES {{ contribution.amount|floatformat:2|intcomma }}
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="empty-state">No contribution history yet</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Active Loans -->
+            <div class="activity-card">
+                <div class="activity-header">
+                    <h3 class="activity-title">
+                        <i class="bi bi-credit-card"></i>
+                        My Loans
+                    </h3>
+                    <a href="#" class="activity-link">View All</a>
+                </div>
+                <div class="activity-list">
+                    {% for loan in my_loans %}
+                    <div class="loan-item">
+                        <div class="loan-header">
+                            <div>
+                                <div class="loan-number">{{ loan.loan_number }}</div>
+                                <div class="loan-chama">{{ loan.chama.name }}</div>
+                            </div>
+                            <div class="loan-status">
+                                {% if loan.status == 'ACTIVE' %}
+                                <span class="badge badge-success">Active</span>
+                                {% elif loan.status == 'PENDING' %}
+                                <span class="badge badge-warning">Pending</span>
+                                {% elif loan.status == 'APPROVED' %}
+                                <span class="badge badge-info">Approved</span>
+                                {% elif loan.status == 'COMPLETED' %}
+                                <span class="badge badge-secondary">Completed</span>
+                                {% elif loan.status == 'DEFAULTED' %}
+                                <span class="badge badge-danger">Defaulted</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="loan-details">
+                            <div class="loan-detail-item">
+                                <span class="detail-label">Principal</span>
+                                <span class="detail-value">KES {{ loan.principal_amount|floatformat:2|intcomma }}</span>
+                            </div>
+                            <div class="loan-detail-item">
+                                <span class="detail-label">Interest</span>
+                                <span class="detail-value">{{ loan.interest_rate }}%</span>
+                            </div>
+                            <div class="loan-detail-item">
+                                <span class="detail-label">Total Amount</span>
+                                <span class="detail-value">KES {{ loan.total_amount|floatformat:2|intcomma }}</span>
+                            </div>
+                        </div>
+
+                        <div class="loan-progress">
+                            <div class="progress-info">
+                                <span>Repayment Progress</span>
+                                <span>{{ loan.amount_paid|floatformat:2|intcomma }} / {{ loan.total_amount|floatformat:2|intcomma }}</span>
+                            </div>
+                            <div class="progress-bar">
+                                {% widthratio loan.amount_paid loan.total_amount 100 as progress_percent %}
+                                <div class="progress-fill" style="width: {{ progress_percent }}%"></div>
+                            </div>
+                            <div class="balance-info">
+                                <span class="balance-label">Balance:</span>
+                                <span class="balance-amount">KES {{ loan.balance|floatformat:2|intcomma }}</span>
+                            </div>
+                        </div>
+
+                        {% if loan.status == 'ACTIVE' %}
+                        <div class="loan-actions">
+                            <button class="btn-link">
+                                <i class="bi bi-cash"></i> Make Repayment
+                            </button>
+                            <button class="btn-link">
+                                <i class="bi bi-file-text"></i> View Schedule
+                            </button>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% empty %}
+                    <div class="empty-state">
+                        <i class="bi bi-credit-card"></i>
+                        <p>No loans yet. You can apply for a loan anytime.</p>
+                        <button class="btn btn-sm btn-primary mt-2">
+                            <i class="bi bi-plus"></i> Apply for Loan
+                        </button>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column -->
+        <div class="dashboard-right-column">
+            <!-- Upcoming Payouts -->
+            <div class="activity-card">
+                <div class="activity-header">
+                    <h3 class="activity-title">
+                        <i class="bi bi-calendar-check"></i>
+                        Upcoming Payouts
+                    </h3>
+                </div>
+                <div class="activity-list">
+                    {% for payout in upcoming_payouts %}
+                    <div class="payout-item">
+                        <div class="payout-icon">
+                            <i class="bi bi-gift"></i>
+                        </div>
+                        <div class="payout-content">
+                            <div class="payout-chama">{{ payout.cycle.chama.name }}</div>
+                            <div class="payout-date">
+                                Scheduled: {{ payout.scheduled_date|date:"M d, Y" }}
+                            </div>
+                            <div class="payout-status-badge">
+                                {% if payout.status == 'PENDING' %}
+                                <span class="badge badge-warning">Pending Approval</span>
+                                {% elif payout.status == 'APPROVED' %}
+                                <span class="badge badge-success">Approved</span>
+                                {% elif payout.status == 'PROCESSING' %}
+                                <span class="badge badge-info">Processing</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="payout-amount">
+                            <span class="amount-label">Amount</span>
+                            <span class="amount-value">KES {{ payout.amount|floatformat:2|intcomma }}</span>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="empty-state">
+                        <i class="bi bi-calendar-x"></i>
+                        <p>No upcoming payouts scheduled</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Upcoming Meetings -->
+            <div class="activity-card">
+                <div class="activity-header">
+                    <h3 class="activity-title">
+                        <i class="bi bi-calendar-event"></i>
+                        Upcoming Meetings
+                    </h3>
+                    <a href="#" class="activity-link">View All</a>
+                </div>
+                <div class="activity-list">
+                    {% for meeting in upcoming_meetings %}
+                    <div class="meeting-item">
+                        <div class="meeting-date-box">
+                            <div class="meeting-day">{{ meeting.scheduled_date|date:"d" }}</div>
+                            <div class="meeting-month">{{ meeting.scheduled_date|date:"M" }}</div>
+                        </div>
+                        <div class="meeting-content">
+                            <div class="meeting-title">{{ meeting.title }}</div>
+                            <div class="meeting-chama">{{ meeting.chama.name }}</div>
+                            <div class="meeting-meta">
+                                <i class="bi bi-clock"></i> {{ meeting.scheduled_date|date:"g:i A" }}
+                                <i class="bi bi-geo-alt"></i> {{ meeting.location }}
+                            </div>
+                        </div>
+                        <button class="btn-icon">
+                            <i class="bi bi-calendar-plus"></i>
+                        </button>
+                    </div>
+                    {% empty %}
+                    <div class="empty-state">
+                        <i class="bi bi-calendar-x"></i>
+                        <p>No upcoming meetings scheduled</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Recent Notifications -->
+            <div class="activity-card" id="notifications">
+                <div class="activity-header">
+                    <h3 class="activity-title">
+                        <i class="bi bi-bell"></i>
+                        Recent Notifications
+                    </h3>
+                    <a href="#" class="activity-link">Mark All Read</a>
+                </div>
+                <div class="notification-list">
+                    {% for notification in recent_notifications %}
+                    <div class="notification-item {% if notification.status != 'READ' %}unread{% endif %}">
+                        <div class="notification-icon 
+                            {% if notification.notification_type == 'CONTRIBUTION_REMINDER' %}reminder
+                            {% elif notification.notification_type == 'PAYOUT_NOTIFICATION' %}payout
+                            {% elif notification.notification_type == 'LOAN_APPROVAL' %}success
+                            {% elif notification.notification_type == 'LOAN_REJECTION' %}danger
+                            {% elif notification.notification_type == 'MEETING_REMINDER' %}meeting
+                            {% elif notification.notification_type == 'PAYMENT_RECEIVED' %}success
+                            {% elif notification.notification_type == 'LATE_PAYMENT' %}warning
+                            {% endif %}">
+                            {% if notification.notification_type == 'CONTRIBUTION_REMINDER' %}
+                            <i class="bi bi-exclamation-circle"></i>
+                            {% elif notification.notification_type == 'PAYOUT_NOTIFICATION' %}
+                            <i class="bi bi-gift"></i>
+                            {% elif notification.notification_type == 'LOAN_APPROVAL' %}
+                            <i class="bi bi-check-circle"></i>
+                            {% elif notification.notification_type == 'LOAN_REJECTION' %}
+                            <i class="bi bi-x-circle"></i>
+                            {% elif notification.notification_type == 'MEETING_REMINDER' %}
+                            <i class="bi bi-calendar-event"></i>
+                            {% elif notification.notification_type == 'PAYMENT_RECEIVED' %}
+                            <i class="bi bi-cash-coin"></i>
+                            {% elif notification.notification_type == 'LATE_PAYMENT' %}
+                            <i class="bi bi-exclamation-triangle"></i>
+                            {% else %}
+                            <i class="bi bi-info-circle"></i>
+                            {% endif %}
+                        </div>
+                        <div class="notification-content">
+                            <div class="notification-title">{{ notification.title }}</div>
+                            <div class="notification-message">{{ notification.message|truncatewords:20 }}</div>
+                            <div class="notification-time">{{ notification.created_at|timesince }} ago</div>
+                        </div>
+                        {% if notification.status != 'READ' %}
+                        <div class="unread-dot"></div>
+                        {% endif %}
+                    </div>
+                    {% empty %}
+                    <div class="empty-state">
+                        <i class="bi bi-bell-slash"></i>
+                        <p>No notifications yet</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Contribution Modal -->
+<div class="modal fade" id="contributionModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-cash-stack"></i> Make Contribution
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="contributionForm">
+                    <div class="mb-3">
+                        <label class="form-label">Select Chama</label>
+                        <select class="form-select" required>
+                            <option value="">Choose a chama...</option>
+                            {% for membership in user_memberships %}
+                            <option value="{{ membership.chama.id }}">{{ membership.chama.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Amount (KES)</label>
+                        <input type="number" class="form-control" step="0.01" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Payment Method</label>
+                        <select class="form-select" required>
+                            <option value="MPESA">M-Pesa</option>
+                            <option value="BANK">Bank Transfer</option>
+                            <option value="CASH">Cash</option>
+                        </select>
+                    </div>
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        Your contribution will be processed and confirmed within 24 hours
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-send"></i> Submit Contribution
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .dashboard-container {
+        max-width: 1600px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+    }
+
+    .page-title {
+        font-size: 28px;
+        font-weight: 700;
+        color: #1a202c;
+        margin-bottom: 5px;
+    }
+
+    .page-subtitle {
+        color: #718096;
+        font-size: 14px;
+    }
+
+    .header-actions {
+        display: flex;
+        gap: 12px;
+    }
+
+    .btn {
+        padding: 10px 20px;
+        border-radius: 8px;
+        border: none;
+        font-weight: 600;
+        font-size: 14px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.3s ease;
+    }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #6b46c1 0%, #805ad5 100%);
+        color: white;
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(107, 70, 193, 0.3);
+    }
+
+    .btn-secondary {
+        background: white;
+        color: #1a202c;
+        border: 1px solid #e2e8f0;
+    }
+
+    .btn-secondary:hover {
+        background: #f7fafc;
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: 16px;
+        padding: 25px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .stat-card.purple {
+        background: linear-gradient(135deg, #6b46c1 0%, #805ad5 100%);
+        color: white;
+    }
+
+    .stat-card.blue {
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        color: white;
+    }
+
+    .stat-card.gradient-orange {
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        color: white;
+    }
+
+    .stat-card.gradient-green {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+    }
+
+    .stat-card-icon {
+        font-size: 40px;
+        opacity: 0.9;
+        margin-bottom: 15px;
+    }
+
+    .stat-card-value {
+        font-size: 28px;
+        font-weight: 700;
+        margin-bottom: 5px;
+    }
+
+    .stat-card-label {
+        font-size: 14px;
+        opacity: 0.9;
+        margin-bottom: 15px;
+    }
+
+    .stat-card-footer {
+        margin-top: 15px;
+        padding-top: 15px;
+        border-top: 1px solid rgba(255, 255, 255, 0.2);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .info-badge, .success-badge, .warning-badge {
+        background: rgba(255, 255, 255, 0.2);
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .view-all-link {
+        color: white;
+        text-decoration: none;
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .section-header {
+        margin: 40px 0 20px 0;
+    }
+
+    .section-title {
+        font-size: 22px;
+        font-weight: 700;
+        color: #1a202c;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .chama-cards-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+        gap: 20px;
+        margin-bottom: 40px;
+    }
+
+    .chama-membership-card {
+        background: white;
+        border-radius: 16px;
+        padding: 25px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        transition: all 0.3s ease;
+    }
+
+    .chama-membership-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    }
+
+    .chama-card-header {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        margin-bottom: 20px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .chama-card-icon {
+        width: 50px;
+        height: 50px;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #6b46c1 0%, #805ad5 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 24px;
+    }
+
+    .chama-card-title {
+        font-size: 18px;
+        font-weight: 700;
+        color: #1a202c;
+        margin-bottom: 3px;
+    }
+
+    .chama-card-subtitle {
+        font-size: 12px;
+        color: #718096;
+        margin: 0;
+    }
+
+    .chama-card-badge {
+        margin-left: auto;
+    }
+
+    .badge {
+        padding: 5px 12px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .badge-success {
+        background: rgba(16, 185, 129, 0.1);
+        color: #10b981;
+    }
+
+    .badge-warning {
+        background: rgba(245, 158, 11, 0.1);
+        color: #f59e0b;
+    }
+
+    .badge-danger {
+        background: rgba(239, 68, 68, 0.1);
+        color: #ef4444;
+    }
+
+    .badge-info {
+        background: rgba(59, 130, 246, 0.1);
+        color: #3b82f6;
+    }
+
+    .badge-secondary {
+        background: rgba(107, 114, 128, 0.1);
+        color: #6b7280;
+    }
+
+    .chama-card-body {
+        margin-bottom: 20px;
+    }
+
+    .chama-info-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+        margin-bottom: 15px;
+    }
+
+    .chama-info-item {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .info-label {
+        font-size: 12px;
+        color: #718096;
+        font-weight: 500;
+    }
+
+    .info-value {
+        font-size: 15px;
+        color: #1a202c;
+        font-weight: 600;
+    }
+
+    .payout-status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px;
+        background: #f7fafc;
+        border-radius: 8px;
+        font-size: 13px;
+    }
+
+    .chama-card-footer {
+        display: flex;
+        justify-content: space-between;
+        padding-top: 20px;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    .btn-link {
+        color: #6b46c1;
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        transition: color 0.3s ease;
+    }
+
+    .btn-link:hover {
+        color: #553c9a;
+    }
+
+    .dashboard-two-column {
+        display: grid;
+        grid-template-columns: 1.5fr 1fr;
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+
+    .activity-card {
+        background: white;
+        border-radius: 16px;
+        padding: 25px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        margin-bottom: 20px;
+    }
+
+    .activity-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding-bottom: 15px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .activity-title {
+        font-size: 16px;
+        font-weight: 700;
+        color: #1a202c;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 0;
+    }
+
+    .count-badge {
+        background: linear-gradient(135deg, #6b46c1 0%, #805ad5 100%);
+        color: white;
+        padding: 3px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .activity-link {
+        color: #6b46c1;
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: 600;
+        transition: color 0.3s ease;
+    }
+
+    .activity-link:hover {
+        color: #553c9a;
+    }
+
+    .activity-list {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .contribution-item {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        padding: 15px;
+        border-radius: 10px;
+        border: 1px solid #e2e8f0;
+        transition: all 0.3s ease;
+    }
+
+    .contribution-item:hover {
+        background: #f7fafc;
+        border-color: #6b46c1;
+    }
+
+    .contribution-item.pending {
+        border-left: 4px solid #f59e0b;
+    }
+
+    .contribution-icon {
+        width: 45px;
+        height: 45px;
+        border-radius: 10px;
+        background: rgba(245, 158, 11, 0.1);
+        color: #f59e0b;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        flex-shrink: 0;
+    }
+
+    .contribution-content {
+        flex: 1;
+    }
+
+    .contribution-chama {
+        font-size: 14px;
+        font-weight: 600;
+        color: #1a202c;
+        margin-bottom: 3px;
+    }
+
+    .contribution-meta {
+        font-size: 12px;
+        color: #718096;
+    }
+
+    .contribution-amount {
+        text-align: right;
+    }
+
+    .amount-value {
+        display: block;
+        font-size: 16px;
+        font-weight: 700;
+        color: #1a202c;
+        margin-bottom: 8px;
+    }
+
+    .btn-pay-now {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        border: none;
+        padding: 6px 15px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .btn-pay-now:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3);
+    }
+
+    .activity-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        border-radius: 10px;
+        transition: background 0.3s ease;
+    }
+
+    .activity-item:hover {
+        background: #f7fafc;
+    }
+
+    .activity-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: #f7fafc;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        flex-shrink: 0;
+    }
+
+    .activity-content {
+        flex: 1;
+    }
+
+    .activity-name {
+        font-size: 14px;
+        font-weight: 600;
+        color: #1a202c;
+        margin-bottom: 3px;
+    }
+
+    .activity-meta {
+        font-size: 12px;
+        color: #718096;
+    }
+
+    .activity-amount {
+        font-size: 15px;
+        font-weight: 700;
+    }
+
+    .activity-amount.success {
+        color: #10b981;
+    }
+
+    .loan-item {
+        padding: 20px;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        margin-bottom: 15px;
+    }
+
+    .loan-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 15px;
+    }
+
+    .loan-number {
+        font-size: 16px;
+        font-weight: 700;
+        color: #1a202c;
+        margin-bottom: 3px;
+    }
+
+    .loan-chama {
+        font-size: 13px;
+        color: #718096;
+    }
+
+    .loan-details {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 15px;
+        margin-bottom: 15px;
+        padding: 15px;
+        background: #f7fafc;
+        border-radius: 8px;
+    }
+
+    .loan-detail-item {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .detail-label {
+        font-size: 11px;
+        color: #718096;
+        text-transform: uppercase;
+        font-weight: 600;
+    }
+
+    .detail-value {
+        font-size: 14px;
+        color: #1a202c;
+        font-weight: 600;
+    }
+
+    .loan-progress {
+        margin-bottom: 15px;
+    }
+
+    .progress-info {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        color: #718096;
+        margin-bottom: 8px;
+    }
+
+    .progress-bar {
+        height: 8px;
+        background: #e2e8f0;
+        border-radius: 4px;
+        overflow: hidden;
+        margin-bottom: 10px;
+    }
+
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        transition: width 0.3s ease;
+    }
+
+    .balance-info {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .balance-label {
+        font-size: 13px;
+        color: #718096;
+    }
+
+    .balance-amount {
+        font-size: 16px;
+        font-weight: 700;
+        color: #ef4444;
+    }
+
+    .loan-actions {
+        display: flex;
+        gap: 15px;
+        padding-top: 15px;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    .payout-item {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        padding: 15px;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        border-left: 4px solid #10b981;
+    }
+
+    .payout-icon {
+        width: 45px;
+        height: 45px;
+        border-radius: 10px;
+        background: rgba(16, 185, 129, 0.1);
+        color: #10b981;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        flex-shrink: 0;
+    }
+
+    .payout-content {
+        flex: 1;
+    }
+
+    .payout-chama {
+        font-size: 14px;
+        font-weight: 600;
+        color: #1a202c;
+        margin-bottom: 3px;
+    }
+
+    .payout-date {
+        font-size: 12px;
+        color: #718096;
+        margin-bottom: 5px;
+    }
+
+    .payout-status-badge {
+        margin-top: 5px;
+    }
+
+    .payout-amount {
+        text-align: right;
+    }
+
+    .amount-label {
+        display: block;
+        font-size: 11px;
+        color: #718096;
+        margin-bottom: 3px;
+    }
+
+    .meeting-item {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        padding: 15px;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        transition: all 0.3s ease;
+    }
+
+    .meeting-item:hover {
+        background: #f7fafc;
+        border-color: #6b46c1;
+    }
+
+    .meeting-date-box {
+        width: 60px;
+        height: 60px;
+        border-radius: 10px;
+        background: linear-gradient(135deg, #6b46c1 0%, #805ad5 100%);
+        color: white;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .meeting-day {
+        font-size: 22px;
+        font-weight: 700;
+        line-height: 1;
+    }
+
+    .meeting-month {
+        font-size: 11px;
+        text-transform: uppercase;
+        margin-top: 2px;
+    }
+
+    .meeting-content {
+        flex: 1;
+    }
+
+    .meeting-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: #1a202c;
+        margin-bottom: 3px;
+    }
+
+    .meeting-chama {
+        font-size: 12px;
+        color: #718096;
+        margin-bottom: 5px;
+    }
+
+    .meeting-meta {
+        font-size: 12px;
+        color: #718096;
+        display: flex;
+        gap: 15px;
+    }
+
+    .btn-icon {
+        width: 35px;
+        height: 35px;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+        background: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-size: 16px;
+        color: #6b46c1;
+    }
+
+    .btn-icon:hover {
+        background: #6b46c1;
+        color: white;
+        border-color: #6b46c1;
+    }
+
+    .notification-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .notification-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        border-radius: 10px;
+        border: 1px solid transparent;
+        transition: all 0.3s ease;
+        position: relative;
+    }
+
+    .notification-item:hover {
+        background: #f7fafc;
+        border-color: #e2e8f0;
+    }
+
+    .notification-item.unread {
+        background: #f0f4ff;
+        border-color: #e0e7ff;
+    }
+
+    .notification-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        flex-shrink: 0;
+    }
+
+    .notification-icon.reminder {
+        background: rgba(245, 158, 11, 0.1);
+        color: #f59e0b;
+    }
+
+    .notification-icon.payout {
+        background: rgba(16, 185, 129, 0.1);
+        color: #10b981;
+    }
+
+    .notification-icon.success {
+        background: rgba(16, 185, 129, 0.1);
+        color: #10b981;
+    }
+
+    .notification-icon.danger {
+        background: rgba(239, 68, 68, 0.1);
+        color: #ef4444;
+    }
+
+    .notification-icon.meeting {
+        background: rgba(107, 70, 193, 0.1);
+        color: #6b46c1;
+    }
+
+    .notification-icon.warning {
+        background: rgba(245, 158, 11, 0.1);
+        color: #f59e0b;
+    }
+
+    .notification-content {
+        flex: 1;
+    }
+
+    .notification-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: #1a202c;
+        margin-bottom: 3px;
+    }
+
+    .notification-message {
+        font-size: 12px;
+        color: #718096;
+        margin-bottom: 3px;
+    }
+
+    .notification-time {
+        font-size: 11px;
+        color: #a0aec0;
+    }
+
+    .unread-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #3b82f6;
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 40px 20px;
+        color: #718096;
+        font-size: 14px;
+    }
+
+    .empty-state i {
+        font-size: 48px;
+        margin-bottom: 10px;
+        opacity: 0.5;
+    }
+
+    .empty-state-large {
+        text-align: center;
+        padding: 60px 20px;
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    }
+
+    .empty-state-large i {
+        font-size: 80px;
+        color: #cbd5e0;
+        margin-bottom: 20px;
+    }
+
+    .empty-state-large h3 {
+        font-size: 20px;
+        color: #1a202c;
+        margin-bottom: 10px;
+    }
+
+    .empty-state-large p {
+        font-size: 14px;
+        color: #718096;
+        margin-bottom: 20px;
+    }
+
+    .btn-sm {
+        padding: 8px 16px;
+        font-size: 13px;
+    }
+
+    /* Modal Styles */
+    .modal-header {
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .modal-title {
+        font-weight: 700;
+        color: #1a202c;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .modal-footer {
+        border-top: 1px solid #e2e8f0;
+    }
+
+    .form-label {
+        font-size: 13px;
+        font-weight: 600;
+        color: #1a202c;
+        margin-bottom: 8px;
+    }
+
+    .form-select, .form-control {
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 10px 15px;
+        font-size: 14px;
+        transition: all 0.3s ease;
+    }
+
+    .form-select:focus, .form-control:focus {
+        border-color: #6b46c1;
+        box-shadow: 0 0 0 3px rgba(107, 70, 193, 0.1);
+        outline: none;
+    }
+
+    .alert {
+        padding: 12px 15px;
+        border-radius: 8px;
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .alert-info {
+        background: rgba(59, 130, 246, 0.1);
+        color: #2563eb;
+        border: 1px solid rgba(59, 130, 246, 0.2);
+    }
+
+    /* Responsive Design */
+    @media (max-width: 1200px) {
+        .dashboard-two-column {
+            grid-template-columns: 1fr;
+        }
+
+        .chama-cards-grid {
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        }
+    }
+
+    @media (max-width: 768px) {
+        .page-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 15px;
+        }
+
+        .header-actions {
+            width: 100%;
+        }
+
+        .header-actions .btn {
+            flex: 1;
+        }
+
+        .stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .chama-cards-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .chama-info-row {
+            grid-template-columns: 1fr;
+        }
+
+        .loan-details {
+            grid-template-columns: 1fr;
+        }
+
+        .contribution-item {
+            flex-direction: column;
+            text-align: center;
+        }
+
+        .contribution-amount {
+            text-align: center;
+            width: 100%;
+        }
+
+        .payout-item, .meeting-item {
+            flex-direction: column;
+            text-align: center;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .stats-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .page-title {
+            font-size: 22px;
+        }
+    }
+
+    @media print {
+        .header-actions, .btn, .btn-link, .activity-link, .chama-card-footer {
+            display: none !important;
+        }
+
+        .dashboard-container {
+            padding: 0;
+        }
+
+        .activity-card, .chama-membership-card {
+            box-shadow: none;
+            border: 1px solid #e2e8f0;
+            page-break-inside: avoid;
+        }
+    }
+</style>
+
+<script>
+    // Auto-dismiss alerts
+    document.addEventListener('DOMContentLoaded', function() {
+        // Mark notification as read on click
+        document.querySelectorAll('.notification-item.unread').forEach(item => {
+            item.addEventListener('click', function() {
+                this.classList.remove('unread');
+                const dot = this.querySelector('.unread-dot');
+                if (dot) {
+                    dot.remove();
+                }
+            });
+        });
+
+        // Animate stats on load
+        const statValues = document.querySelectorAll('.stat-card-value');
+        statValues.forEach(stat => {
+            const value = stat.textContent;
+            stat.style.opacity = '0';
+            stat.style.transform = 'translateY(20px)';
+            
+            setTimeout(() => {
+                stat.style.transition = 'all 0.6s ease';
+                stat.style.opacity = '1';
+                stat.style.transform = 'translateY(0)';
+            }, 100);
+        });
+    });
+
+    // Handle contribution form submission
+    const contributionForm = document.getElementById('contributionForm');
+    if (contributionForm) {
+        contributionForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            // Add your AJAX submission logic here
+            alert('Contribution submitted successfully!');
+            bootstrap.Modal.getInstance(document.getElementById('contributionModal')).hide();
+        });
+    }
+</script>
+{% endblock %}
